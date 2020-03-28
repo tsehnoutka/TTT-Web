@@ -1,0 +1,66 @@
+/* Styles go here */
+/*
+* {
+  font-family:tahoma;
+  font-size:12px;
+  padding:0px;margin:0px;
+}
+p {
+  line-height:18px;
+}
+div {
+  width:500px;
+  margin-left:auto;
+  margin-right:auto;
+}
+*/
+.input {
+  border-radius:2px;
+  border:1px
+  solid #ccc;
+    margin-top:10px;
+    padding:5px;
+    width:400px;
+}
+.status {
+  width:88px;
+  display:block;
+  float:left;
+  margin-top:15px;
+}
+
+table {
+  margin: 5px auto;
+}
+.cube {
+    float: left;
+    width: 15px;
+    height: 15px;
+    background-color: red;
+    padding: 10px;
+    border: 1px solid black;
+}
+.content {
+  padding:5px;
+  background:#ddd;
+  border-radius:5px;
+    overflow-y:
+    scroll;
+    border:1px
+    solid #CCC;
+    margin-top:10px;
+    height: 160px;
+  }
+.grid{
+width: 100px;
+height: 100px;
+cursor:pointer;
+}
+.vert {
+  border-left: 2px solid black;
+  border-right: 2px solid black;
+}
+.hori {
+  border-top: 2px solid black;
+  border-bottom: 2px solid black;
+}
