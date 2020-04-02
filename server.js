@@ -1,114 +1,101 @@
-// https://medium.com/@martin.sikora/node-js-websocket-simple-chat-tutorial-2def3a841b61
+var express = require('express');
+var app = express();
+var server = require('http').Server(app);
+var io = require('socket.io')(server);
+var portNumber = 5000;
+var code=0;
+var mCodes = new Map();
 
-"use strict";
-// Optional. You will see this name in eg. 'ps' or 'top' command
-process.title = 'node-chat';
-// Port where we'll run the websocket server
-var webSocketsServerPort = 1338;
-// websocket and http servers
-var webSocketServer = require('websocket').server;
-var http = require('http');
-/**
- * Global variables
- */
-// latest 100 messages
-var history = [ ];
-// list of currently connected clients (users)
-var clients = [ ];
-/**
- * Helper function for escaping input strings
- */
-function htmlEntities(str) {
-  return String(str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+server.listen(process.env.PORT || portNumber);
+console.log("server is up and running, listening on port: " + portNumber);
+
+function getCode(){
+    do{
+        var c = Math.floor(Math.random() * Math.floor(10000));
+        var done = mCodes.has(c);
+    }
+    while (done)
+    mCodes.set(c,1);
+    return c;
 }
-// Array with some colors
-var colors = [ 'red', 'green', 'blue', 'magenta', 'purple', 'plum', 'orange' ];
-// ... in random order
-colors.sort(function(a,b) { return Math.random() > 0.5; } );
-/**
- * HTTP server
- */
-var server = http.createServer(function(request, response) {
-  // Not important for us. We're writing WebSocket server,
-  // not HTTP server
-});
-server.listen(webSocketsServerPort, function() {
-  console.log((new Date()) + " Server is listening on port "
-      + webSocketsServerPort);
-});
-/**
- * WebSocket server
- */
-var wsServer = new webSocketServer({
-  // WebSocket server is tied to a HTTP server. WebSocket
-  // request is just an enhanced HTTP request. For more info
-  // http://tools.ietf.org/html/rfc6455#page-6
-  httpServer: server
-});
-// This callback function is called every time someone
-// tries to connect to the WebSocket server
-wsServer.on('request', function(request) {
-  console.log((new Date()) + ' Connection from origin '
-      + request.origin + '.');
-  // accept connection - you should check 'request.origin' to
-  // make sure that client is connecting from your website
-  // (http://en.wikipedia.org/wiki/Same_origin_policy)
-  var connection = request.accept(null, request.origin);
-  // we need to know client index to remove them on 'close' event
-  var index = clients.push(connection) - 1;
-  var userName = false;
-  var userColor = false;
-  console.log((new Date()) + ' Connection accepted.');
-  // send back chat history
-  if (history.length > 0) {
-    connection.sendUTF(
-        JSON.stringify({ type: 'history', data: history} ));
-  }
-  // user sent some message
-  connection.on('message', function(message) {
-    if (message.type === 'utf8') { // accept only text
-    // first message sent by user is their name
-     if (userName === false) {
-        // remember user name
-        userName = htmlEntities(message.utf8Data);
-        // get random color and send it back to the user
-        userColor = colors.shift();
-        connection.sendUTF(
-            JSON.stringify({ type:'color', data: userColor }));
-        console.log((new Date()) + ' User is known as: ' + userName
-                    + ' with ' + userColor + ' color.');
-      } else { // log and broadcast the message
-        console.log((new Date()) + ' Received Message from '
-                    + userName + ': ' + message.utf8Data);
 
-        // we want to keep history of all sent messages
-        var obj = {
-          time: (new Date()).getTime(),
-          text: htmlEntities(message.utf8Data),
-          author: userName,
-          color: userColor
-        };
-        history.push(obj);
-        history = history.slice(-100);
-        // broadcast message to all connected clients
-        var json = JSON.stringify({ type:'message', data: obj });
-        for (var i=0; i < clients.length; i++) {
-          clients[i].sendUTF(json);
-        }
-      }
+io.on('connection', function(socket){
+    console.log("on Connection");
+
+socket.on('createGame', function(data){
+    console.log("on create Game");
+    code = getCode();
+    socket.join(code);
+    var now = new Date().getTime();
+    socket.emit('newGame', {name: data.name, room: code, time: now});
+
+
+    // clean up any unused rooms
+    /*
+    const aKeys = Array.from( mCodes.keys());
+    for(i=0;i<aKeys.length; i++){
+        var tempRoom = aKeys[i];;
+        //var clients = io.sockets.adapter.rooms[tempRoom].sockets;
+        io.in(tempRoom).clients((err , clients) => {
+            // clients will be array of socket ids , currently available in given room
+            io.of(tempRoom).clients((error, clients) => {
+              if (error){
+                clients.forEach(socketId => io.sockets.sockets[socketId].leave(tempRoom));
+                return;
+              }
+              console.log(clients); // => [PZDoMHjiu8PYfRiKAAAF, Anw2LatarvGVVXEIAAAD]
+            });            
+        });
     }
-  });
-  // user disconnected
-  connection.on('close', function(connection) {
-    if (userName !== false && userColor !== false) {
-      console.log((new Date()) + " Peer "
-          + connection.remoteAddress + " disconnected.");
-      // remove user from the list of connected clients
-      clients.splice(index, 1);
-      // push back user's color to be reused by another user
-      colors.push(userColor);
-    }
-  });
+    */
+
 });
+socket.on('joinGame', function(data){
+    console.log("on Join Game");
+    var now = new Date().getTime();
+    code = parseInt(data.room);
+    var exist = mCodes.has(code);
+    if ( !exist ){
+        socket.emit('err', {text: 'That code does not exist, please enter a valid code.', time: now});
+    }
+    else{
+
+        var room = io.nsps['/'].adapter.rooms[code];
+        if ( ( room && room.length == 1 ) || (2 > mCodes.get(code) ) ){
+            var count = mCodes.get(code) + 1;
+            mCodes.set(code,count);
+            socket.join(code);
+            console.log(io.nsps['/'].adapter.rooms[code]);
+            //socket.broadcast.to(code).emit('player1', {});
+            var msg = data.name + " has joined the game";
+            var now = new Date().getTime();
+            console.log("broadcasting joined message");
+            socket.broadcast.to(code).emit('joined', {text: msg, time: now});
+            socket.emit('player2', {code: code, time: now});
+            //socket.in(code).emit('joined', {text: msg, time: now});
+        }
+        else {
+            socket.emit('err', {text: 'Sorry, The room is full!', time: now});
+        }
+    }
+});
+
+socket.on('message', function(data){
+    console.log("on Message" );
+    var now = new Date().getTime();
+    //socket.broadcast.to(data.room).emit('message', { name:data.name, text: data.text, color: data.color, time: now});
+    socket.emit('message', {  name:data.name, text: data.text, color: data.color, time: now});
+    socket.in(data.room).emit('message', {  name:data.name, text: data.text, color: data.color, time: now});
+});
+
+socket.on('turn', function(data){
+    //console.log("on Turn: " + data.room);
+    //socket.broadcast.to(data.room).emit('message', { name:data.name, text: data.text, color: data.color, time: now});
+    //socket.emit('message', {  name:data.name, text: data.text, color: data.color, time: now});
+    socket.broadcast.to(data.room).emit('turn', {name: data.name, id: data.id, room: data.room});
+});
+socket.on('playAgain', function(data){
+    socket.broadcast.to(data.room).emit('playAgain');
+});
+
+})  //  end io.on  connection
